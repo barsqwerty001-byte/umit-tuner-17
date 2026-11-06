@@ -115,14 +115,14 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
       <span class="state" id="press-state"></span></p>
 
     <div class="seg" id="presets">
-      <button data-on="0.08">Лёгкое</button>
-      <button data-on="0.14">Обычное</button>
-      <button data-on="0.25">Тугое</button>
+      <button data-on="0.028">Лёгкое</button>
+      <button data-on="0.036">Обычное</button>
+      <button data-on="0.05">Тугое</button>
     </div>
 
     <div class="row">
       <label for="s-on">Порог клика</label><output id="o-on">—</output>
-      <input type="range" id="s-on" min="10" max="60" step="0.5">
+      <input type="range" id="s-on" min="16" max="70" step="0.5">
       <div class="steps"><button data-step="-1" data-for="s-on">− легче</button><button data-step="1" data-for="s-on">туже +</button></div>
       <div class="hint">Меньше — кликает от лёгкого касания. Больше — нужно давить сильнее, меньше случайных кликов.</div>
     </div>
@@ -207,7 +207,7 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
   const B = n => '6d5f' + n + '-1f8a-4c2e-9b3d-2a7e5c4b8f10';
   const SVC = B('0001'), CFG = B('0002'), CMD = B('0003'), BAT = B('0004'),
         FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007');
-  const FULL = 4;                       // rise that fills the meter
+  const FULL = 0.15;                    // rise that fills the meter (sealed cap: presses +0.04..0.10)
   const $ = id => document.getElementById(id);
 
   let device = null, link = null, cfg = null, fcfg = null, dirty = false, busy = false;
@@ -216,8 +216,8 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
   const HIST = 200;                     // 10 s at 20 Hz
 
   // ---- helpers --------------------------------------------------------
-  const pct = rise => Math.min(100, 100 * Math.sqrt(Math.max(0, rise) / FULL));
-  const riseOf = p => FULL * (p / 100) * (p / 100);
+  const pct = rise => Math.min(100, 100 * Math.max(0, rise) / FULL);
+  const riseOf = p => FULL * p / 100;
   function toast(msg, bad) {
     const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
     clearTimeout(toast.timer); toast.timer = setTimeout(() => t.className = 'toast', 2600);
@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
     return b;
   }
   function fcfgFromOn(on) {
-    on = Math.min(5, Math.max(0.05, on));
+    on = Math.min(5, Math.max(0.025, on));
     const off = Math.max(0.02, on * 0.5);
     return {on, off, wake: Math.min(10, Math.max(off, on * 0.86))};
   }
@@ -515,7 +515,7 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
 
   if (!navigator.bluetooth) $('unsupported').hidden = false;
   enable(false); setDirty(false);
-  fcfg = fcfgFromOn(0.14); fill();
+  fcfg = fcfgFromOn(0.036); fill();
   setInterval(readBattery, 15000);
   requestAnimationFrame(draw);
 })();
