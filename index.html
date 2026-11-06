@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Umit — настройка</title>
+<meta name="description" content="Настройка мыши Umit 17.x по Bluetooth: сила нажатия, чувствительность, живые датчики.">
+<style>
+:root{
+  --bg:#f4f5f7;--card:#fff;--ink:#16181d;--muted:#667085;--line:#e3e6eb;
+  --accent:#2563eb;--accent-ink:#fff;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;
+  --press:#7c3aed;--turn:#0891b2;--nod:#db2777;--track:#eceef2;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0f1115;--card:#181b21;--ink:#e8eaee;--muted:#98a2b3;--line:#2a2f38;
+  --accent:#4f8cff;--accent-ink:#0b1020;--ok:#22c55e;--warn:#f59e0b;--bad:#f87171;
+  --press:#a78bfa;--turn:#22d3ee;--nod:#f472b6;--track:#252a33;--shadow:none}}
+:root[data-theme=dark]{
+  --bg:#0f1115;--card:#181b21;--ink:#e8eaee;--muted:#98a2b3;--line:#2a2f38;
+  --accent:#4f8cff;--accent-ink:#0b1020;--ok:#22c55e;--warn:#f59e0b;--bad:#f87171;
+  --press:#a78bfa;--turn:#22d3ee;--nod:#f472b6;--track:#252a33;--shadow:none}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:96px}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0}
+h2{font-size:17px;margin:0 0 12px}
+.muted{color:var(--muted);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0;box-shadow:var(--shadow)}
+header.card{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
+.dot.live{background:var(--ok)}.dot.busy{background:var(--warn)}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;cursor:pointer;min-height:44px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:90px}
+.seg button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* press meter */
+.meter{position:relative;height:56px;border-radius:12px;background:var(--track);overflow:hidden;margin:8px 0 4px}
+.meter .fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--press);opacity:.85;transition:width 60ms linear}
+.meter.pressed .fill{background:var(--ok)}
+.meter .mark{position:absolute;top:0;bottom:0;width:3px;background:var(--ink);opacity:.8}
+.meter .mark.off{opacity:.35}
+.meter .peak{position:absolute;top:0;bottom:0;width:2px;background:var(--warn)}
+.meter .label{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.state{font-weight:700}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;margin:14px 0}
+.row label{font-weight:600}
+.row output{font-variant-numeric:tabular-nums;color:var(--muted);min-width:64px;text-align:right}
+.row input[type=range]{grid-column:1/-1;width:100%;height:32px;accent-color:var(--accent)}
+.row .hint{grid-column:1/-1;font-size:13px;color:var(--muted);margin-top:-4px}
+.steps{display:flex;gap:6px;grid-column:1/-1}
+.steps button{flex:1;padding:6px;min-height:36px}
+.checks{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+.checks label{display:flex;gap:8px;align-items:center;min-height:44px}
+.checks input{width:22px;height:22px;accent-color:var(--accent)}
+/* dashboard */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile .k{font-size:13px;color:var(--muted)}
+.tile .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;font-weight:500;color:var(--muted)}
+canvas{width:100%;height:150px;display:block;border-radius:10px;background:var(--track);margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:5px}
+.bubble{position:relative;width:120px;height:120px;border-radius:50%;background:var(--track);margin:6px auto 0;border:1px solid var(--line)}
+.bubble::before,.bubble::after{content:"";position:absolute;background:var(--line)}
+.bubble::before{left:50%;top:0;bottom:0;width:1px}.bubble::after{top:50%;left:0;right:0;height:1px}
+.bubble b{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent);left:51px;top:51px;transition:left 80ms,top 80ms}
+.warn{border-left:4px solid var(--warn);padding:10px 12px;background:var(--track);border-radius:8px;font-size:14px;margin:10px 0}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar div{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.bar .grow{flex:1;font-size:14px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.show{opacity:1}.toast.bad{background:var(--bad);color:#fff}
+[hidden]{display:none!important}
+details summary{cursor:pointer;font-weight:600;min-height:32px}
+</style>
+</head>
+<body>
+<main>
+  <header class="card">
+    <div>
+      <h1>Umit</h1>
+      <div class="muted"><span class="dot" id="dot"></span><span id="status">Не подключено</span></div>
+      <div class="muted" id="fw">прошивка: —</div>
+    </div>
+    <button class="primary" id="btn-connect">Подключить</button>
+  </header>
+
+  <div class="warn" id="unsupported" hidden>
+    Этот браузер не умеет Bluetooth. Открой страницу в Chrome на Android или на компьютере (Windows, Mac).
+    На iPhone Safari и Chrome Bluetooth не поддерживают.
+  </div>
+  <div class="warn" id="old-fw" hidden>
+    На мыши старая прошивка: настройка нажатия и датчики работают начиная с 17.6, движение на дашборде — с 17.7.
+    Если прошивка новая, а пишет это — удали мышь в настройках Bluetooth телефона и подключи заново.
+  </div>
+  <div class="warn" id="no-sensor" hidden>Датчик нажатия не найден: проверь пайку D1 и резистор 10 кОм.</div>
+
+  <!-- PRESS -->
+  <section class="card">
+    <h2>Сила нажатия</h2>
+    <div class="meter" id="meter">
+      <div class="fill" id="m-fill"></div>
+      <div class="peak" id="m-peak" hidden></div>
+      <div class="mark off" id="m-off" title="отпускание"></div>
+      <div class="mark" id="m-on" title="клик"></div>
+      <div class="label" id="m-label">—</div>
+    </div>
+    <div class="scale"><span>0%</span><span>нажим</span><span>100%</span></div>
+    <p class="muted">Чёрная черта — порог клика: дошёл до неё — клик. Бледная — где клик отпускается.
+      <span class="state" id="press-state"></span></p>
+
+    <div class="seg" id="presets">
+      <button data-on="0.08">Лёгкое</button>
+      <button data-on="0.14">Обычное</button>
+      <button data-on="0.25">Тугое</button>
+    </div>
+
+    <div class="row">
+      <label for="s-on">Порог клика</label><output id="o-on">—</output>
+      <input type="range" id="s-on" min="10" max="60" step="0.5">
+      <div class="steps"><button data-step="-1" data-for="s-on">− легче</button><button data-step="1" data-for="s-on">туже +</button></div>
+      <div class="hint">Меньше — кликает от лёгкого касания. Больше — нужно давить сильнее, меньше случайных кликов.</div>
+    </div>
+
+    <details>
+      <summary>Подобрать по моим нажатиям</summary>
+      <p class="muted">Нажми 5 раз так, как обычно кликаешь. Страница поставит порог на половину твоего обычного нажима.</p>
+      <div class="tiles">
+        <div class="tile"><div class="k">нажатий записано</div><div class="v" id="cal-n">0 / 5</div></div>
+        <div class="tile"><div class="k">последнее нажатие</div><div class="v" id="last-peak">—</div></div>
+      </div>
+      <p><button id="btn-cal">Начать запись</button> <button id="btn-cal-apply" disabled>Поставить порог</button></p>
+      <p class="muted" id="cal-note">Нажатие засчитывается, только если дошло до текущего порога. Если не доходит — сначала сделай порог «Лёгкое».</p>
+    </details>
+  </section>
+
+  <!-- MOTION -->
+  <section class="card">
+    <h2>Движение</h2>
+    <div class="row">
+      <label for="s-x">Скорость влево-вправо</label><output id="o-x">—</output>
+      <input type="range" id="s-x" min="0" max="100" step="0.1">
+      <div class="steps"><button data-step="-1" data-for="s-x">−</button><button data-step="1" data-for="s-x">+</button></div>
+    </div>
+    <div class="row">
+      <label for="s-y">Скорость вверх-вниз</label><output id="o-y">—</output>
+      <input type="range" id="s-y" min="0" max="100" step="0.1">
+      <div class="steps"><button data-step="-1" data-for="s-y">−</button><button data-step="1" data-for="s-y">+</button></div>
+    </div>
+    <div class="row">
+      <label for="s-dz">Порог мелких движений</label><output id="o-dz">—</output>
+      <input type="range" id="s-dz" min="0" max="0.15" step="0.001">
+      <div class="hint">Больше — курсор не дрожит, но мелкие движения головой не двигают его.</div>
+    </div>
+    <div class="row">
+      <label for="s-smooth">Плавность</label><output id="o-smooth">—</output>
+      <input type="range" id="s-smooth" min="0" max="100" step="1">
+      <div class="hint">Больше — курсор плавнее, но чуть запаздывает.</div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="c-ix"> Перевернуть влево-вправо</label>
+      <label><input type="checkbox" id="c-iy"> Перевернуть вверх-вниз</label>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="card">
+    <h2>Датчики</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">нажим</div><div class="v" id="d-press">—</div></div>
+      <div class="tile"><div class="k">ноль датчика</div><div class="v" id="d-zero">—</div></div>
+      <div class="tile"><div class="k">АЦП</div><div class="v" id="d-raw">—</div></div>
+      <div class="tile"><div class="k">поворот</div><div class="v" id="d-turn">—</div></div>
+      <div class="tile"><div class="k">кивок</div><div class="v" id="d-nod">—</div></div>
+      <div class="tile"><div class="k">курсор</div><div class="v" id="d-speed">—</div></div>
+      <div class="tile"><div class="k">батарея</div><div class="v" id="d-bat">—</div></div>
+      <div class="tile"><div class="k">наклон платы</div><div class="v" id="d-tilt">—</div></div>
+    </div>
+    <canvas id="chart-press" height="150"></canvas>
+    <div class="legend"><span><i style="background:var(--press)"></i>нажим</span><span><i style="background:var(--ink)"></i>порог клика</span></div>
+    <canvas id="chart-motion" height="150"></canvas>
+    <div class="legend"><span><i style="background:var(--turn)"></i>поворот</span><span><i style="background:var(--nod)"></i>кивок</span><span>±200 °/с</span></div>
+    <div class="bubble" title="куда смотрит низ платы"><b id="bubble"></b></div>
+    <p class="muted" style="text-align:center">Пузырёк — как стоит плата относительно земли.</p>
+  </section>
+
+  <p class="muted">Изменения работают сразу. Чтобы они остались после перезагрузки — «Сохранить».
+    Сайт ничего не отправляет в интернет: всё идёт только между браузером и мышью.</p>
+</main>
+
+<div class="bar"><div>
+  <span class="grow" id="dirty">—</span>
+  <button id="btn-defaults" disabled>Заводские</button>
+  <button class="primary" id="btn-save" disabled>Сохранить</button>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script src="tuning.js"></script>
+<script>
+(function () {
+  'use strict';
+  const B = n => '6d5f' + n + '-1f8a-4c2e-9b3d-2a7e5c4b8f10';
+  const SVC = B('0001'), CFG = B('0002'), CMD = B('0003'), BAT = B('0004'),
+        FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007');
+  const FULL = 4;                       // rise that fills the meter
+  const $ = id => document.getElementById(id);
+
+  let device = null, link = null, cfg = null, fcfg = null, dirty = false, busy = false;
+  let live = null, motion = null, lastSent = null, speed = 0;
+  const hist = [];                      // {p, on, t, n}
+  const HIST = 200;                     // 10 s at 20 Hz
+
+  // ---- helpers --------------------------------------------------------
+  const pct = rise => Math.min(100, 100 * Math.sqrt(Math.max(0, rise) / FULL));
+  const riseOf = p => FULL * (p / 100) * (p / 100);
+  function toast(msg, bad) {
+    const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => t.className = 'toast', 2600);
+  }
+  function status(text, kind) { $('status').textContent = text; $('dot').className = 'dot ' + (kind || ''); }
+  function setDirty(on) {
+    dirty = on;
+    $('dirty').textContent = !link ? 'не подключено' : on ? 'есть несохранённые изменения' : 'всё сохранено';
+  }
+  function enable(on) {
+    ['btn-save', 'btn-defaults'].forEach(id => $(id).disabled = !on);
+    document.querySelectorAll('main input, main .steps button, #presets button')
+      .forEach(el => el.disabled = !on);
+  }
+
+  // ---- sensor config (char 0006, 16 bytes) ----------------------------
+  function fcfgDecode(dv) {
+    if (dv.byteLength !== 16 || dv.getUint8(0) !== 0x46 || dv.getUint8(1) !== 1) throw new Error('неизвестный формат датчика');
+    return {on: dv.getFloat32(4, true), off: dv.getFloat32(8, true), wake: dv.getFloat32(12, true)};
+  }
+  function fcfgEncode(c) {
+    const b = new ArrayBuffer(16), dv = new DataView(b);
+    dv.setUint8(0, 0x46); dv.setUint8(1, 1);
+    dv.setFloat32(4, c.on, true); dv.setFloat32(8, c.off, true); dv.setFloat32(12, c.wake, true);
+    return b;
+  }
+  function fcfgFromOn(on) {
+    on = Math.min(5, Math.max(0.05, on));
+    const off = Math.max(0.02, on * 0.5);
+    return {on, off, wake: Math.min(10, Math.max(off, on * 0.86))};
+  }
+
+  // ---- fill UI from cfg/fcfg -------------------------------------------
+  const smoothOf = mc => Math.round(Math.min(100, Math.max(0, (1 - Math.log10(mc)) * 50)));
+  const mcOf = s => Math.pow(10, 1 - s / 50);
+  function fill() {
+    if (fcfg) {
+      const p = pct(fcfg.on);
+      $('s-on').value = p.toFixed(1);
+      $('o-on').textContent = Math.round(p) + '%';
+      $('m-on').style.left = p + '%';
+      $('m-off').style.left = pct(fcfg.off) + '%';
+      document.querySelectorAll('#presets button').forEach(b =>
+        b.classList.toggle('on', Math.abs(+b.dataset.on - fcfg.on) < 0.005));
+    }
+    if (cfg) {
+      $('s-x').value = cfg.yawSensitivity; $('o-x').textContent = cfg.yawSensitivity.toFixed(1);
+      $('s-y').value = cfg.pitchSensitivity; $('o-y').textContent = cfg.pitchSensitivity.toFixed(1);
+      $('s-dz').value = cfg.yawDeadzone; $('o-dz').textContent = cfg.yawDeadzone.toFixed(3);
+      const s = smoothOf(cfg.minCutoff);
+      $('s-smooth').value = s; $('o-smooth').textContent = s + '%';
+      $('c-ix').checked = !!(cfg.invert & 1); $('c-iy').checked = !!(cfg.invert & 2);
+    }
+  }
+
+  // ---- writes (debounced, all through the session queue) ---------------
+  let cfgTimer = 0, fTimer = 0;
+  function pushCfg() {
+    setDirty(true); fill();
+    clearTimeout(cfgTimer);
+    cfgTimer = setTimeout(() => {
+      const cur = link; if (!cur) return;
+      cur.write(cfg).then(a => { if (link === cur) { cfg = a; fill(); } })
+        .catch(e => toast('Не применилось: ' + (e.message || e), true));
+    }, 150);
+  }
+  function pushFcfg() {
+    setDirty(true); fill();
+    clearTimeout(fTimer);
+    fTimer = setTimeout(() => {
+      const cur = link, want = Object.assign({}, fcfg); if (!cur || !link.fcfgChr) return;
+      cur.enqueue(async () => {
+        await cur.put(cur.fcfgChr, fcfgEncode(want));
+        return fcfgDecode(await cur.fcfgChr.readValue());
+      }).then(a => {
+        if (link !== cur) return;
+        if (Math.abs(a.on - want.on) > 1e-4) toast('Мышь не приняла этот порог', true);
+        fcfg = a; fill();
+      }).catch(e => toast('Не применилось: ' + (e.message || e), true));
+    }, 150);
+  }
+
+  // ---- live data -------------------------------------------------------
+  let pressPeak = 0, wasPressed = false, cal = null;
+  function onLive(ev) {
+    const dv = ev.target.value;
+    if (dv.byteLength !== 20) return;
+    live = {flags: dv.getUint8(1), raw: dv.getUint16(2, true), zero: dv.getFloat32(4, true),
+            rise: dv.getFloat32(8, true), on: dv.getFloat32(12, true), off: dv.getFloat32(16, true)};
+    const pressed = !!(live.flags & 2), p = pct(live.rise);
+    $('no-sensor').hidden = !!(live.flags & 1);
+    $('m-fill').style.width = p + '%';
+    $('m-label').textContent = Math.round(p) + '%';
+    $('meter').classList.toggle('pressed', pressed);
+    $('press-state').textContent = pressed ? (live.flags & 4 ? 'Сейчас: перетаскивание' : 'Сейчас: нажато') : '';
+    $('d-press').textContent = Math.round(p) + '%';
+    $('d-zero').innerHTML = live.zero.toFixed(2) + ' <small>отн.</small>';
+    $('d-raw').textContent = live.raw;
+    if (pressed) pressPeak = Math.max(pressPeak, live.rise);
+    if (wasPressed && !pressed) pressDone(pressPeak);
+    if (!pressed) pressPeak = 0;
+    wasPressed = pressed;
+    hist.push({p, on: pct(live.on), t: motion ? motion.turn : 0, n: motion ? motion.nod : 0});
+    if (hist.length > HIST) hist.shift();
+  }
+  function pressDone(peak) {
+    const pp = pct(peak);
+    $('last-peak').textContent = Math.round(pp) + '%';
+    const mk = $('m-peak'); mk.hidden = false; mk.style.left = pp + '%';
+    if (cal) {
+      cal.push(peak);
+      $('cal-n').textContent = cal.length + ' / 5';
+      if (cal.length >= 5) {
+        $('btn-cal').textContent = 'Записать заново';
+        $('btn-cal-apply').disabled = false;
+        const s = cal.slice().sort((a, b) => a - b), med = s[2];
+        cal.result = fcfgFromOn(med * 0.5);
+        $('cal-note').textContent = 'Твой обычный нажим ≈ ' + Math.round(pct(med)) + '%. Предлагаю порог ' +
+          Math.round(pct(cal.result.on)) + '%.';
+        cal.done = true;
+      }
+    }
+  }
+  function onMotion(ev) {
+    const dv = ev.target.value;
+    if (dv.byteLength !== 20) return;
+    const now = performance.now();
+    const sx = dv.getInt16(2, true), sy = dv.getInt16(4, true);
+    motion = {flags: dv.getUint8(1), turn: dv.getFloat32(6, true), nod: dv.getFloat32(10, true),
+              up: [dv.getInt16(14, true) / 1e4, dv.getInt16(16, true) / 1e4, dv.getInt16(18, true) / 1e4]};
+    if (lastSent) {
+      const dt = (now - lastSent.t) / 1000;
+      const dx = ((sx - lastSent.x + 32768) & 0xffff) - 32768, dy = ((sy - lastSent.y + 32768) & 0xffff) - 32768;
+      if (dt > 0) speed = speed * 0.7 + 0.3 * Math.hypot(dx, dy) / dt;
+    }
+    lastSent = {x: sx, y: sy, t: now};
+    $('d-turn').innerHTML = motion.turn.toFixed(0) + ' <small>°/с</small>';
+    $('d-nod').innerHTML = motion.nod.toFixed(0) + ' <small>°/с</small>';
+    $('d-speed').innerHTML = Math.round(speed) + ' <small>точек/с</small>';
+    const [ux, uy, uz] = motion.up;
+    $('d-tilt').innerHTML = (Math.acos(Math.min(1, Math.abs(uz))) * 180 / Math.PI).toFixed(0) + '<small>°' + (uz < 0 ? ' вверх дном' : '') + '</small>';
+    const b = $('bubble');
+    b.style.left = (51 + Math.max(-1, Math.min(1, ux)) * 50) + 'px';
+    b.style.top = (51 + Math.max(-1, Math.min(1, uy)) * 50) + 'px';
+    if (!live) { hist.push({p: 0, on: 0, t: motion.turn, n: motion.nod}); if (hist.length > HIST) hist.shift(); }
+  }
+
+  // ---- charts ----------------------------------------------------------
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function prep(c) {
+    const r = c.getBoundingClientRect(), d = devicePixelRatio || 1;
+    if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(150 * d); }
+    const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, r.width, 150);
+    return [g, r.width, 150];
+  }
+  function line(g, w, h, key, color, map, dash) {
+    if (hist.length < 2) return;
+    g.strokeStyle = color; g.lineWidth = 2; g.setLineDash(dash || []); g.beginPath();
+    hist.forEach((s, i) => { const x = w - (hist.length - 1 - i) * (w / (HIST - 1)), y = map(s[key]);
+      i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke(); g.setLineDash([]);
+  }
+  function draw() {
+    let [g, w, h] = prep($('chart-press'));
+    line(g, w, h, 'on', css('--ink'), v => h - 6 - v / 100 * (h - 12), [5, 4]);
+    line(g, w, h, 'p', css('--press'), v => h - 6 - v / 100 * (h - 12));
+    [g, w, h] = prep($('chart-motion'));
+    g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    const m = v => h / 2 - Math.max(-200, Math.min(200, v)) / 200 * (h / 2 - 6);
+    line(g, w, h, 't', css('--turn'), m);
+    line(g, w, h, 'n', css('--nod'), m);
+    requestAnimationFrame(draw);
+  }
+
+  // ---- battery ---------------------------------------------------------
+  async function readBattery() {
+    const cur = link; if (!cur || !cur.batChr) return;
+    try {
+      const dv = await cur.enqueue(() => cur.batChr.readValue());
+      if (link !== cur || dv.byteLength < 8) return;
+      const ok = dv.getUint8(1), p = dv.getUint8(2), mv = dv.getUint16(6, true);
+      $('d-bat').innerHTML = ok ? p + '% <small>' + (mv / 1000).toFixed(2) + ' В</small>' : '— <small>меряю</small>';
+    } catch (e) { /* not critical */ }
+  }
+
+  // ---- connect ---------------------------------------------------------
+  async function opt(svc, uuid) { try { return await svc.getCharacteristic(uuid); } catch (e) { return null; } }
+  async function open() {
+    status('Подключение…', 'busy');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    const cur = new UmitProtocol.Session(await svc.getCharacteristic(CFG), await svc.getCharacteristic(CMD));
+    cur.fcfgChr = await opt(svc, FCFG);
+    cur.batChr = await opt(svc, BAT);
+    const fl = await opt(svc, FLIVE), ml = await opt(svc, MLIVE);
+    cfg = await cur.read();
+    if (cur.fcfgChr) fcfg = fcfgDecode(await cur.enqueue(() => cur.fcfgChr.readValue()));
+    link = cur;
+    if (fl) { fl.addEventListener('characteristicvaluechanged', onLive); await cur.enqueue(() => fl.startNotifications()); }
+    if (ml) { ml.addEventListener('characteristicvaluechanged', onMotion); await cur.enqueue(() => ml.startNotifications()); }
+    $('old-fw').hidden = !!(cur.fcfgChr && fl && ml);
+    try {
+      const dis = await server.getPrimaryService('device_information');
+      const v = new TextDecoder().decode(await (await dis.getCharacteristic(0x2a24)).readValue());
+      $('fw').textContent = 'прошивка: ' + v.replace(/^Umit\s*v?/, '');
+    } catch (e) { $('fw').textContent = 'прошивка: ?'; }
+    fill(); enable(true); setDirty(false);
+    status('Подключено' + (device.name ? ' — ' + device.name : ''), 'live');
+    $('btn-connect').textContent = 'Переподключить';
+    readBattery();
+  }
+  function drop() {
+    if (link) link.close();
+    link = null; live = motion = lastSent = null; enable(false); setDirty(false);
+  }
+  async function connect() {
+    if (busy) return;
+    if (!navigator.bluetooth) { $('unsupported').hidden = false; return; }
+    busy = true; $('btn-connect').disabled = true;
+    drop();
+    try {
+      if (device) {
+        try { await open(); return; }
+        catch (e) { if (device.gatt.connected) device.gatt.disconnect(); drop(); device = null; }
+      }
+      status('Выбор устройства…', 'busy');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{namePrefix: 'Umit'}], optionalServices: [SVC, 'device_information']});
+      device.addEventListener('gattserverdisconnected', onGone);
+      await open();
+    } catch (e) {
+      drop();
+      const m = String(e.message || e);
+      if (/cancel/i.test(m)) status('Не подключено');
+      else { status('Не удалось подключиться'); toast(m, true); }
+    } finally { busy = false; $('btn-connect').disabled = false; }
+  }
+  function onGone() {
+    if (!device || busy) return;          // our own disconnect while connecting
+    drop(); status('Связь потеряна — переподключаюсь…', 'busy');
+    setTimeout(() => { if (!link && !busy) connect(); }, 1200);
+  }
+
+  // ---- controls --------------------------------------------------------
+  $('s-on').addEventListener('input', e => { fcfg = fcfgFromOn(riseOf(+e.target.value)); pushFcfg(); });
+  document.querySelectorAll('#presets button').forEach(b =>
+    b.addEventListener('click', () => { fcfg = fcfgFromOn(+b.dataset.on); pushFcfg(); }));
+  $('s-x').addEventListener('input', e => { cfg.yawSensitivity = +e.target.value; pushCfg(); });
+  $('s-y').addEventListener('input', e => { cfg.pitchSensitivity = +e.target.value; pushCfg(); });
+  $('s-dz').addEventListener('input', e => { cfg.yawDeadzone = cfg.pitchDeadzone = +e.target.value; pushCfg(); });
+  $('s-smooth').addEventListener('input', e => { cfg.minCutoff = +mcOf(+e.target.value).toFixed(3); pushCfg(); });
+  $('c-ix').addEventListener('change', e => { cfg.invert = (cfg.invert & 2) | (e.target.checked ? 1 : 0); pushCfg(); });
+  $('c-iy').addEventListener('change', e => { cfg.invert = (cfg.invert & 1) | (e.target.checked ? 2 : 0); pushCfg(); });
+  document.querySelectorAll('.steps button').forEach(b => b.addEventListener('click', () => {
+    const s = $(b.dataset.for), step = (+b.dataset.step) * (s.id === 's-on' ? 1 : 1);
+    s.value = Math.min(+s.max, Math.max(+s.min, +s.value + step));
+    s.dispatchEvent(new Event('input'));
+  }));
+  $('btn-cal').addEventListener('click', () => {
+    cal = []; $('cal-n').textContent = '0 / 5'; $('btn-cal-apply').disabled = true;
+    $('btn-cal').textContent = 'Записываю… нажимай';
+    $('cal-note').textContent = 'Нажимай как обычно, 5 раз.';
+  });
+  $('btn-cal-apply').addEventListener('click', () => {
+    if (!cal || !cal.result) return;
+    fcfg = cal.result; pushFcfg(); toast('Порог поставлен. Нажми «Сохранить», чтобы остался.');
+  });
+  $('btn-save').addEventListener('click', async () => {
+    const cur = link; if (!cur) return;
+    $('btn-save').disabled = true;
+    try {
+      await cur.save(cfg);
+      if (link === cur) { setDirty(false); toast('Сохранено в мышь — останется после перезагрузки'); }
+    } catch (e) { toast('Не сохранилось: ' + (e.message || e), true); }
+    finally { $('btn-save').disabled = !link; }
+  });
+  $('btn-defaults').addEventListener('click', async () => {
+    const cur = link; if (!cur) return;
+    try {
+      cfg = await cur.defaults();
+      if (cur.fcfgChr) fcfg = fcfgDecode(await cur.enqueue(() => cur.fcfgChr.readValue()));
+      fill(); setDirty(true);
+      toast('Заводские значения. «Сохранить» — чтобы остались после перезагрузки');
+    } catch (e) { toast('Не получилось: ' + (e.message || e), true); }
+  });
+  $('btn-connect').addEventListener('click', connect);
+  addEventListener('beforeunload', e => { if (dirty && link) { e.preventDefault(); e.returnValue = ''; } });
+
+  if (!navigator.bluetooth) $('unsupported').hidden = false;
+  enable(false); setDirty(false);
+  fcfg = fcfgFromOn(0.14); fill();
+  setInterval(readBattery, 15000);
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
