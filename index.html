@@ -418,7 +418,10 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
     link = cur;
     if (fl) { fl.addEventListener('characteristicvaluechanged', onLive); await cur.enqueue(() => fl.startNotifications()); }
     if (ml) { ml.addEventListener('characteristicvaluechanged', onMotion); await cur.enqueue(() => ml.startNotifications()); }
-    $('old-fw').hidden = !!(cur.fcfgChr && fl && ml);
+    const fwWarn = $('old-fw');
+    if (!cur.fcfgChr || !fl) { fwWarn.hidden = false; fwWarn.textContent = 'Прошивка старше 17.6: настройки нажатия и датчика нажатия не будет. Если прошивка новая — удали мышь в настройках Bluetooth и подключи заново.'; }
+    else if (!ml) { fwWarn.hidden = false; fwWarn.textContent = 'Всё работает, кроме движения головы на дашборде: оно появится после прошивки 17.7.'; }
+    else fwWarn.hidden = true;
     try {
       const dis = await server.getPrimaryService('device_information');
       const v = new TextDecoder().decode(await (await dis.getCharacteristic(0x2a24)).readValue());
@@ -491,7 +494,11 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
     try {
       await cur.save(cfg);
       if (link === cur) { setDirty(false); toast('Сохранено в мышь — останется после перезагрузки'); }
-    } catch (e) { toast('Не сохранилось: ' + (e.message || e), true); }
+    } catch (e) {
+      const m = String(e.message || e);
+      $('dirty').textContent = 'Ошибка сохранения: ' + m;
+      toast('Не сохранилось: ' + m, true);
+    }
     finally { $('btn-save').disabled = !link; }
   });
   $('btn-defaults').addEventListener('click', async () => {
