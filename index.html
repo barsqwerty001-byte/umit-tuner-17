@@ -65,10 +65,23 @@ button:disabled{opacity:.45;cursor:default}
 canvas{width:100%;height:150px;display:block;border-radius:10px;background:var(--track);margin-top:10px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:5px}
-.bubble{position:relative;width:120px;height:120px;border-radius:50%;background:var(--track);margin:6px auto 0;border:1px solid var(--line)}
-.bubble::before,.bubble::after{content:"";position:absolute;background:var(--line)}
-.bubble::before{left:50%;top:0;bottom:0;width:1px}.bubble::after{top:50%;left:0;right:0;height:1px}
-.bubble b{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent);left:51px;top:51px;transition:left 80ms,top 80ms}
+.scene{height:280px;perspective:700px;display:flex;align-items:center;justify-content:center;margin-top:8px;overflow:hidden}
+.table{transform-style:preserve-3d;transform:rotateX(52deg) scale(1.3)}
+.pcb{position:relative;width:189px;height:158px;transform-style:preserve-3d;transition:transform 90ms linear}
+.pcb .f{position:absolute;inset:0;backface-visibility:hidden}
+.pcb .top{background:linear-gradient(135deg,#1d2b4f,#121c36);border-radius:9px;transform:translateZ(3px);box-shadow:inset 0 0 0 1px #2c3d66}
+.pcb .bot{background:#0d1428;border-radius:9px;transform:rotateY(180deg) translateZ(3px)}
+.pcb .side{background:#0a1022}
+.pcb .sx{width:6px;height:142px;top:8px}
+.pcb .sy{width:173px;height:6px;left:8px}
+.pcb .can{position:absolute;left:28px;top:27px;width:104px;height:104px;border-radius:5px;transform:translateZ(9px);
+  background:linear-gradient(140deg,#e6e9ee,#aab1bc 55%,#d5d9e0);box-shadow:0 0 0 1px #8a93a0}
+.pcb .canwall{position:absolute;background:#8f98a6}
+.pcb .pin{position:absolute;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle,#0d1428 34%,#d9a441 38%,#b7862c 70%);transform:translateZ(3.5px)}
+.pcb .chip{position:absolute;background:#16181d;border-radius:2px;transform:translateZ(5px);box-shadow:0 0 0 1px #2a2e36}
+.pcb .led{position:absolute;width:6px;height:4px;border-radius:1px;background:#eef1f5;transform:translateZ(4.5px)}
+.pcb .pad{position:absolute;background:#c9a24a;transform:translateZ(3.4px);border-radius:1px}
+.shadow{position:absolute;left:50%;top:50%;width:200px;height:170px;margin:-85px 0 0 -100px;border-radius:20px;background:rgba(0,0,0,.18);filter:blur(14px);transform:translateZ(-40px)}
 .warn{border-left:4px solid var(--warn);padding:10px 12px;background:var(--track);border-radius:8px;font-size:14px;margin:10px 0}
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
 .bar div{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center}
@@ -185,8 +198,8 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
     <div class="legend"><span><i style="background:var(--press)"></i>нажим</span><span><i style="background:var(--ink)"></i>порог клика</span></div>
     <canvas id="chart-motion" height="150"></canvas>
     <div class="legend"><span><i style="background:var(--turn)"></i>поворот</span><span><i style="background:var(--nod)"></i>кивок</span><span>±200 °/с</span></div>
-    <div class="bubble" title="куда смотрит низ платы"><b id="bubble"></b></div>
-    <p class="muted" style="text-align:center">Пузырёк — как стоит плата относительно земли.</p>
+    <div class="scene" title="как стоит плата относительно земли"><div class="table"><div class="shadow"></div><div class="pcb" id="pcb"></div></div></div>
+    <p class="muted" style="text-align:center">Плата повторяет наклон настоящей платы в капе.</p>
   </section>
 
   <p class="muted">Изменения работают сразу. Чтобы они остались после перезагрузки — «Сохранить».
@@ -453,11 +466,34 @@ details summary{cursor:pointer;font-weight:600;min-height:32px}
     $('d-speed').innerHTML = Math.round(speed) + ' <small>точек/с</small>';
     const [ux, uy, uz] = motion.up;
     $('d-tilt').innerHTML = (Math.acos(Math.min(1, Math.abs(uz))) * 180 / Math.PI).toFixed(0) + '<small>°' + (uz < 0 ? ' вверх дном' : '') + '</small>';
-    const b = $('bubble');
-    b.style.left = (51 + Math.max(-1, Math.min(1, ux)) * 50) + 'px';
-    b.style.top = (51 + Math.max(-1, Math.min(1, uy)) * 50) + 'px';
+    // board frame -> screen: turned 90 deg counter-clockwise (checked on the real board)
+    const vx = uy, vy = -ux;
+    const ax = Math.atan2(vx, uz) * 180 / Math.PI;             // raise the +x edge
+    const ay = Math.asin(Math.max(-1, Math.min(1, vy))) * 180 / Math.PI;  // raise the near edge
+    $('pcb').style.transform = 'rotateY(' + (-ax).toFixed(1) + 'deg) rotateX(' + ay.toFixed(1) + 'deg)';
     if (!live) { hist.push({p: 0, on: 0, t: motion.turn, n: motion.nod}); if (hist.length > HIST) hist.shift(); }
   }
+
+  // ---- 3D board: XIAO-sized (21 x 17.5 mm), shape only ----
+  (function buildBoard() {
+    const b = $('pcb'), W = 189, H = 158, add = (cls, st) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, st || {}); b.appendChild(d); return d; };
+    add('f top'); add('f bot');
+    add('f side sx', {left: '0', transform: 'translateX(-3px) rotateY(90deg)'});
+    add('f side sx', {left: (W - 6) + 'px', transform: 'translateX(3px) rotateY(90deg)'});
+    add('f side sy', {top: '0', transform: 'translateY(-3px) rotateX(90deg)'});
+    add('f side sy', {top: (H - 6) + 'px', transform: 'translateY(3px) rotateX(90deg)'});
+    for (let i = 0; i < 7; i++) {                       // castellated pins on the two long sides
+      const x = 10 + i * 26.5;
+      add('pin', {left: x + 'px', top: '-6px'}); add('pin', {left: x + 'px', top: (H - 9) + 'px'});
+    }
+    add('can');                                           // RF shield over the nRF52840 module
+    add('canwall', {left: '28px', top: '131px', width: '104px', height: '6px', transform: 'translateZ(6px) rotateX(90deg)', transformOrigin: 'top'});
+    add('chip', {left: '144px', top: '34px', width: '24px', height: '24px'});   // IMU
+    add('chip', {left: '146px', top: '74px', width: '18px', height: '30px'});   // charger / regulator
+    add('chip', {left: '148px', top: '114px', width: '14px', height: '10px'});
+    add('led', {left: '172px', top: '40px'}); add('led', {left: '172px', top: '56px'});
+    add('pad', {left: '6px', top: '58px', width: '10px', height: '40px', background: '#20305a'});
+  })();
 
   // ---- charts ----------------------------------------------------------
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
