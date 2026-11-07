@@ -67,7 +67,7 @@
     async commandNow(byte) {
       await this.put(this.cmd,new Uint8Array([byte]));
       if (!this.cmd.properties.read) return false;
-      for (let i=0;i<200;i++)   // two files are written now (17.6+): give flash ~10 s {
+      for (let i=0;i<200;i++) {   // two files are written now (17.6+): give flash ~10 s
         this.check();
         const status = await this.cmd.readValue();
         this.check();
