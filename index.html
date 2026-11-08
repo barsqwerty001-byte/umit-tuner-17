@@ -222,6 +222,14 @@ details .tiles{margin:8px 0}
     </section>
   </div>
 
+  <section class="card" id="rec-card" style="margin-top:16px">
+    <h2>Запись движения головы <span class="muted" style="text-transform:none;letter-spacing:0">— для настройки алгоритма, прошивка 18.1+</span></h2>
+    <div id="rec-phase" style="font-size:22px;font-weight:700;min-height:34px">Надень капу, подключись и нажми «Начать запись». Около 2.5 минуты.</div>
+    <div class="meter" style="height:10px;margin:10px 0"><div class="fill" id="rec-bar" style="background:var(--accent)"></div></div>
+    <p class="muted" id="rec-info">—</p>
+    <p><button class="primary" id="btn-rec" disabled>Начать запись</button> <button id="btn-rec-stop" disabled>Остановить</button></p>
+  </section>
+
   <p class="muted foot">Изменения работают сразу; «Сохранить» оставляет их в мыши после перезагрузки.
     Сайт ничего не отправляет в интернет — всё идёт только между браузером и мышью.</p>
 </main>
@@ -327,7 +335,7 @@ details .tiles{margin:8px 0}
   'use strict';
   const B = n => '6d5f' + n + '-1f8a-4c2e-9b3d-2a7e5c4b8f10';
   const SVC = B('0001'), CFG = B('0002'), CMD = B('0003'), BAT = B('0004'),
-        FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007');
+        FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007'), HREC = B('0008');
   const FULL = 0.15;                    // rise that fills the meter (sealed cap: presses +0.04..0.10)
   const $ = id => document.getElementById(id);
 
@@ -534,6 +542,7 @@ details .tiles{margin:8px 0}
     const cur = new UmitProtocol.Session(await svc.getCharacteristic(CFG), await svc.getCharacteristic(CMD));
     cur.fcfgChr = await opt(svc, FCFG);
     cur.batChr = await opt(svc, BAT);
+    cur.recChr = await opt(svc, HREC);
     const fl = await opt(svc, FLIVE), ml = await opt(svc, MLIVE);
     cfg = await cur.read();
     if (cur.fcfgChr) fcfg = fcfgDecode(await cur.enqueue(() => cur.fcfgChr.readValue()));
@@ -555,11 +564,15 @@ details .tiles{margin:8px 0}
       cur.keepOk = parseFloat(v.replace(/^Umit\s*v?/, '')) >= 18; keep();
     } catch (e) { $('fw').textContent = 'прошивка: ?'; }
     fill(); enable(true); setDirty(false);
+    $('btn-rec').disabled = !cur.recChr;
+    if (!cur.recChr) $('rec-info').textContent = 'Нужна прошивка 18.1 или новее (после обновления — удалить Umit в Bluetooth и подключить заново).';
     status('Подключено' + (device.name ? ' — ' + device.name : ''), 'live');
     $('btn-connect').textContent = 'Переподключить';
     readBattery();
   }
   function drop() {
+    if (rec) recStop(true);               // keep what was recorded before the link dropped
+    $('btn-rec').disabled = true;
     if (link) { clearInterval(link.keep); link.close(); }
     link = null; live = motion = lastSent = null; enable(false); setDirty(false);
   }
@@ -637,6 +650,61 @@ details .tiles{margin:8px 0}
       toast('Заводские значения. «Сохранить» — чтобы остались после перезагрузки');
     } catch (e) { toast('Не получилось: ' + (e.message || e), true); }
   });
+  // ---- head recording (firmware 18.1, char 0008) ----
+  const PHASES = [
+    [20, 'Держи голову неподвижно, смотри в центр экрана'],
+    [30, 'Мелкие точные движения: води курсор между двумя близкими точками'],
+    [30, 'Обычная работа: крупные движения через весь экран'],
+    [20, 'Снова спокойно, расслабься, голову не двигай'],
+    [30, 'Нажимай датчик как при кликах, голову старайся держать на месте'],
+  ];
+  let rec = null;
+  function recStop(save) {
+    if (!rec) return;
+    clearInterval(rec.timer);
+    const cur = link, r = rec; rec = null;
+    $('btn-rec').disabled = !link || !link.recChr; $('btn-rec-stop').disabled = true;
+    if (cur) cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([5]))).catch(() => {});
+    if (cur && r.chr) { r.chr.removeEventListener('characteristicvaluechanged', r.on); cur.enqueue(() => r.chr.stopNotifications()).catch(() => {}); }
+    if (!save || !r.rows.length) { $('rec-phase').textContent = 'Запись остановлена'; return; }
+    const csv = 'i,phase,turn_dps,nod_dps,pressed,frozen\n' + r.rows.map(x => x.join(',')).join('\n') + '\n';
+    const a = document.createElement('a'), d = new Date();
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+    a.download = 'umit-head-' + d.toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    $('rec-phase').textContent = 'Готово! Файл сохранён в «Загрузки»: ' + a.download;
+  }
+  $('btn-rec').addEventListener('click', async () => {
+    const cur = link; if (!cur || !cur.recChr || rec) return;
+    const total = PHASES.reduce((t, p) => t + p[0], 0);
+    rec = {rows: [], lost: 0, last: -1, chr: cur.recChr, t0: performance.now(), phase: 0};
+    rec.on = ev => {
+      const dv = ev.target.value; if (!rec || dv.byteLength !== 20) return;
+      const seq = dv.getUint16(2, true), fl = dv.getUint8(1);
+      if (rec.last >= 0) rec.lost += ((seq - rec.last - 1) & 0xffff);
+      rec.last = seq;
+      for (let k = 0; k < 4; k++) rec.rows.push([rec.rows.length, rec.phase + 1,
+        (dv.getInt16(4 + k * 4, true) / 100).toFixed(2), (dv.getInt16(6 + k * 4, true) / 100).toFixed(2), fl & 1, (fl >> 1) & 1]);
+    };
+    rec.chr.addEventListener('characteristicvaluechanged', rec.on);
+    try {
+      await cur.enqueue(() => rec.chr.startNotifications());
+      await cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([4])));
+    } catch (e) { toast('Запись не началась: ' + (e.message || e), true); recStop(false); return; }
+    $('btn-rec').disabled = true; $('btn-rec-stop').disabled = false;
+    rec.timer = setInterval(() => {
+      if (!rec) return;
+      const t = (performance.now() - rec.t0) / 1000;
+      let acc = 0, i = 0; while (i < PHASES.length && t >= acc + PHASES[i][0]) acc += PHASES[i++][0];
+      if (i >= PHASES.length) { recStop(true); return; }
+      rec.phase = i;
+      $('rec-phase').textContent = (i + 1) + '/' + PHASES.length + ': ' + PHASES[i][1] + ' — ' + Math.ceil(acc + PHASES[i][0] - t) + ' с';
+      $('rec-bar').style.width = (100 * t / total) + '%';
+      $('rec-info').textContent = 'Записано ' + rec.rows.length + ' точек (' + (rec.rows.length / Math.max(1, t)).toFixed(0) + ' в секунду), потеряно пакетов: ' + rec.lost;
+    }, 200);
+  });
+  $('btn-rec-stop').addEventListener('click', () => recStop(true));
+
   $('btn-connect').addEventListener('click', connect);
   addEventListener('beforeunload', e => { if (dirty && link) { e.preventDefault(); e.returnValue = ''; } });
 
