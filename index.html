@@ -112,6 +112,7 @@ details .tiles{margin:8px 0}
   <span id="dirty"></span>
   <button id="btn-defaults" disabled>Заводские</button>
   <button id="btn-save" disabled>Сохранить</button>
+  <button id="btn-live" title="Живые данные с датчиков. Пока выключены, курсор работает без задержек">Датчики: выкл</button>
   <button class="primary" id="btn-connect">Подключить</button>
 </div></header>
 
@@ -154,6 +155,7 @@ details .tiles{margin:8px 0}
 
     <section class="card c-tiles">
       <h2>Датчики</h2>
+      <p class="muted" id="live-off">Живые данные выключены, чтобы курсор не тормозил. Включить — кнопка «Датчики» сверху.</p>
       <div class="tiles">
         <div class="tile"><div class="k">нажим</div><div class="v" id="d-press">—</div></div>
         <div class="tile"><div class="k">батарея</div><div class="v" id="d-bat">—</div></div>
@@ -444,6 +446,7 @@ details .tiles{margin:8px 0}
     wasPressed = pressed;
     hist.push({p, on: pct(live.on), t: motion ? motion.turn : 0, n: motion ? motion.nod : 0});
     if (hist.length > HIST) hist.shift();
+    chartDirty = true;
   }
   function pressDone(peak) {
     const pp = pct(peak);
@@ -485,6 +488,7 @@ details .tiles{margin:8px 0}
     b.style.left = (51 + Math.max(-1, Math.min(1, ux)) * 50) + 'px';
     b.style.top = (51 + Math.max(-1, Math.min(1, uy)) * 50) + 'px';
     if (!live) { hist.push({p: 0, on: 0, t: motion.turn, n: motion.nod}); if (hist.length > HIST) hist.shift(); }
+    chartDirty = true;
   }
 
   // ---- charts ----------------------------------------------------------
@@ -502,16 +506,19 @@ details .tiles{margin:8px 0}
       i ? g.lineTo(x, y) : g.moveTo(x, y); });
     g.stroke(); g.setLineDash([]);
   }
+  let chartDirty = true, colors = null;
   function draw() {
+    if (!chartDirty) return;
+    chartDirty = false;
+    if (!colors) colors = {ink: css('--ink'), press: css('--press'), line: css('--line'), turn: css('--turn'), nod: css('--nod')};
     let [g, w, h] = prep($('chart-press'));
-    line(g, w, h, 'on', css('--ink'), v => h - 6 - v / 100 * (h - 12), [5, 4]);
-    line(g, w, h, 'p', css('--press'), v => h - 6 - v / 100 * (h - 12));
+    line(g, w, h, 'on', colors.ink, v => h - 6 - v / 100 * (h - 12), [5, 4]);
+    line(g, w, h, 'p', colors.press, v => h - 6 - v / 100 * (h - 12));
     [g, w, h] = prep($('chart-motion'));
-    g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    g.strokeStyle = colors.line; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
     const m = v => h / 2 - Math.max(-200, Math.min(200, v)) / 200 * (h / 2 - 6);
-    line(g, w, h, 't', css('--turn'), m);
-    line(g, w, h, 'n', css('--nod'), m);
-    requestAnimationFrame(draw);
+    line(g, w, h, 't', colors.turn, m);
+    line(g, w, h, 'n', colors.nod, m);
   }
 
   // ---- battery ---------------------------------------------------------
@@ -541,9 +548,9 @@ details .tiles{margin:8px 0}
     if (fl) { fl.addEventListener('characteristicvaluechanged', onLive); await cur.enqueue(() => fl.startNotifications()); }
     if (ml) { ml.addEventListener('characteristicvaluechanged', onMotion); await cur.enqueue(() => ml.startNotifications()); }
     // 18.0: the mouse sends live data only while the page asks for it, about once a second
-    const keep = () => { if (link === cur && cur.keepOk && document.visibilityState === 'visible')
+    const keep = () => { if (link === cur && cur.keepOk && liveOn && document.visibilityState === 'visible')
       cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([3]))).catch(() => {}); };
-    cur.keep = setInterval(keep, 1000);   // 17.x would answer 'bad command' to it: only 18+
+    cur.keep = setInterval(keep, 1000); cur.keepNow = keep;   // 17.x would answer 'bad command' to it: only 18+
     const fwWarn = $('old-fw');
     if (!cur.fcfgChr || !fl) { fwWarn.hidden = false; fwWarn.textContent = 'Прошивка старше 17.6: настройки нажатия и датчика нажатия не будет. Если прошивка новая — удали мышь в настройках Bluetooth и подключи заново.'; }
     else if (!ml) { fwWarn.hidden = false; fwWarn.textContent = 'Всё работает, кроме движения головы на дашборде: оно появится после прошивки 17.7.'; }
@@ -607,6 +614,7 @@ details .tiles{margin:8px 0}
     s.dispatchEvent(new Event('input'));
   }));
   $('btn-cal').addEventListener('click', () => {
+    if (!liveOn) setLive(true);   // the calibration needs the live pressure
     cal = []; $('cal-n').textContent = '0 / 5'; $('btn-cal-apply').disabled = true;
     $('btn-cal').textContent = 'Записываю… нажимай';
     $('cal-note').textContent = 'Нажимай как обычно, 5 раз.';
@@ -637,14 +645,27 @@ details .tiles{margin:8px 0}
       toast('Заводские значения. «Сохранить» — чтобы остались после перезагрузки');
     } catch (e) { toast('Не получилось: ' + (e.message || e), true); }
   });
+  let liveOn = false;
+  function setLive(on) {
+    liveOn = on;
+    $('btn-live').textContent = on ? 'Датчики: вкл' : 'Датчики: выкл';
+    $('btn-live').classList.toggle('primary', on);
+    $('live-off').hidden = on;
+    if (on && link && link.keepNow) link.keepNow();
+    if (link && !link.keepOk && !on) toast('На прошивке старше 18.0 датчики идут всегда — выключить их нельзя', true);
+  }
+  $('btn-live').addEventListener('click', () => setLive(!liveOn));
+
   $('btn-connect').addEventListener('click', connect);
   addEventListener('beforeunload', e => { if (dirty && link) { e.preventDefault(); e.returnValue = ''; } });
 
   if (!navigator.bluetooth) $('unsupported').hidden = false;
   enable(false); setDirty(false);
   fcfg = fcfgFromOn(0.036); fill();
+  setLive(false);
   setInterval(readBattery, 15000);
-  requestAnimationFrame(draw);
+  setInterval(draw, 100);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { colors = null; chartDirty = true; });
 })();
 </script>
 </body>
