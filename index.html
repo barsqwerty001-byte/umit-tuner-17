@@ -192,56 +192,35 @@ details .tiles{margin:8px 0}
     </section>
 
     <section class="card c-movecfg">
-      <h2>Курсор <span class="muted" id="prof" style="text-transform:none;letter-spacing:0"></span></h2>
-      <p class="muted" id="cur-old" hidden>Новые настройки курсора (точность, скорость, подавление дрожи) появятся с прошивкой 18.2.</p>
-      <div id="cur-new">
-        <div class="seg" id="hostpre">
-          <button data-host="pc">Для компьютера</button>
-          <button data-host="phone">Для телефона</button>
-          <button data-host="calm">Спокойнее</button>
+      <h2>Курсор</h2>
+      <div class="rows">
+        <div class="row">
+          <label for="s-x">Скорость влево-вправо</label><output id="o-x">—</output>
+          <input type="range" id="s-x" min="0" max="100" step="0.1">
+          <div class="steps"><button data-step="-1" data-for="s-x">−</button><button data-step="1" data-for="s-x">+</button></div>
         </div>
-        <div class="rows">
-          <div class="row">
-            <label for="s-sx">Точность влево-вправо</label><output id="o-sx">—</output>
-            <input type="range" id="s-sx" min="2" max="40" step="0.5">
-            <div class="hint">Медленный поворот: точек на 1° головы. Меньше — точнее.</div>
-          </div>
-          <div class="row">
-            <label for="s-sy">Точность вверх-вниз</label><output id="o-sy">—</output>
-            <input type="range" id="s-sy" min="2" max="40" step="0.5">
-            <div class="hint">Медленный кивок: точек на 1° головы.</div>
-          </div>
-          <div class="row">
-            <label for="s-fx">Скорость влево-вправо</label><output id="o-fx">—</output>
-            <input type="range" id="s-fx" min="20" max="400" step="5">
-            <div class="hint">Быстрый поворот: больше — через экран меньшим движением.</div>
-          </div>
-          <div class="row">
-            <label for="s-fy">Скорость вверх-вниз</label><output id="o-fy">—</output>
-            <input type="range" id="s-fy" min="20" max="400" step="5">
-            <div class="hint">Быстрый кивок. На телефоне обычно нужно больше, чем по X.</div>
-          </div>
-          <div class="row">
-            <label for="s-trem">Подавление дрожи</label><output id="o-trem">—</output>
-            <input type="range" id="s-trem" min="0" max="100" step="1">
-            <div class="hint">Больше — курсор спокойнее, но чуть запаздывает.</div>
-          </div>
+        <div class="row">
+          <label for="s-y">Скорость вверх-вниз</label><output id="o-y">—</output>
+          <input type="range" id="s-y" min="0" max="100" step="0.1">
+          <div class="steps"><button data-step="-1" data-for="s-y">−</button><button data-step="1" data-for="s-y">+</button></div>
         </div>
-        <div class="checks">
-          <label><input type="checkbox" id="c-ix"> Перевернуть влево-вправо</label>
-          <label><input type="checkbox" id="c-iy"> Перевернуть вверх-вниз</label>
+        <div class="row">
+          <label for="s-dz">Порог мелких движений</label><output id="o-dz">—</output>
+          <input type="range" id="s-dz" min="0" max="0.15" step="0.001">
+          <div class="hint">Больше — не дрожит, но мелкие движения не двигают курсор.</div>
         </div>
+        <div class="row">
+          <label for="s-smooth">Плавность</label><output id="o-smooth">—</output>
+          <input type="range" id="s-smooth" min="0" max="100" step="1">
+          <div class="hint">Больше — плавнее, но чуть запаздывает.</div>
+        </div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="c-ix"> Перевернуть влево-вправо</label>
+        <label><input type="checkbox" id="c-iy"> Перевернуть вверх-вниз</label>
       </div>
     </section>
   </div>
-
-  <section class="card" id="rec-card" style="margin-top:16px">
-    <h2>Запись движения головы <span class="muted" style="text-transform:none;letter-spacing:0">— для настройки алгоритма, прошивка 18.1+</span></h2>
-    <div id="rec-phase" style="font-size:22px;font-weight:700;min-height:34px">Надень капу, подключись и нажми «Начать запись». Около 2.5 минуты.</div>
-    <div class="meter" style="height:10px;margin:10px 0"><div class="fill" id="rec-bar" style="background:var(--accent)"></div></div>
-    <p class="muted" id="rec-info">—</p>
-    <p><button class="primary" id="btn-rec" disabled>Начать запись</button> <button id="btn-rec-stop" disabled>Остановить</button></p>
-  </section>
 
   <p class="muted foot">Изменения работают сразу; «Сохранить» оставляет их в мыши после перезагрузки.
     Сайт ничего не отправляет в интернет — всё идёт только между браузером и мышью.</p>
@@ -250,58 +229,42 @@ details .tiles{margin:8px 0}
 
 <script>
 /* tuning.js, inlined so the page works even opened as a lone file */
-/* Shared, testable Web Bluetooth codec and transaction queue.
-   Settings format 4 (firmware up to 18.1) and 5 (18.2+: head tracking, per-host profiles). */
+/* Shared, testable Web Bluetooth codec and transaction queue. */
 (function (root) {
   'use strict';
-  const LAYOUTS = {
-    4: [['magic',0,'u8'],['version',1,'u8'],['invert',2,'u8'],['holdMode',3,'u8'],
-        ['maxStep',4,'u16'],['idleMinutes',6,'u16'],['yawSensitivity',8,'f32'],['pitchSensitivity',12,'f32'],
-        ['exponent',16,'f32'],['minCutoff',20,'f32'],['beta',24,'f32'],
-        ['yawDeadzone',28,'f32'],['pitchDeadzone',32,'f32'],['outputDeadzone',36,'f32']],
-    5: [['magic',0,'u8'],['version',1,'u8'],['invert',2,'u8'],['profile',3,'u8'],
-        ['maxStep',4,'u16'],['reserved',6,'u16'],['slowGainX',8,'f32'],['slowGainY',12,'f32'],
-        ['fastGainX',16,'f32'],['fastGainY',20,'f32'],['slowSpeed',24,'f32'],['fastSpeed',28,'f32'],
-        ['minCutoff',32,'f32'],['beta',36,'f32']]
-  };
-  const RANGES = {
-    4: {yawSensitivity:[0,100],pitchSensitivity:[0,100],exponent:[.1,2],minCutoff:[.01,50],beta:[0,10],
-        yawDeadzone:[0,1],pitchDeadzone:[0,1],outputDeadzone:[0,1],maxStep:[1,127],holdMode:[0,1],idleMinutes:[0,1440]},
-    5: {slowGainX:[0,400],slowGainY:[0,400],fastGainX:[0,600],fastGainY:[0,600],slowSpeed:[0,60],fastSpeed:[1,200],
-        minCutoff:[.05,20],beta:[0,1],maxStep:[1,127],profile:[0,255],reserved:[0,65535]}
-  };
-  const INTS = {4: ['maxStep','holdMode','idleMinutes'], 5: ['maxStep','profile','reserved']};
+  const layout = [['magic',0,'u8'],['version',1,'u8'],['invert',2,'u8'],['holdMode',3,'u8'],
+    ['maxStep',4,'u16'],['idleMinutes',6,'u16'],['yawSensitivity',8,'f32'],['pitchSensitivity',12,'f32'],
+    ['exponent',16,'f32'],['minCutoff',20,'f32'],['beta',24,'f32'],
+    ['yawDeadzone',28,'f32'],['pitchDeadzone',32,'f32'],['outputDeadzone',36,'f32']];
+  const ranges = {yawSensitivity:[0,100],pitchSensitivity:[0,100],exponent:[.1,2],
+    minCutoff:[.01,50],beta:[0,10],yawDeadzone:[0,1],pitchDeadzone:[0,1],outputDeadzone:[0,1],maxStep:[1,127],holdMode:[0,1],idleMinutes:[0,1440]};
   function validate(o) {
-    if (!o || o.magic !== 0x4D || !LAYOUTS[o.version] || !Number.isInteger(o.invert) || o.invert < 0 || o.invert > 3)
-      throw new Error('Неизвестный формат настроек');
-    const ranges = RANGES[o.version];
+    if (!o || o.magic !== 0x4D || o.version !== 4 || !Number.isInteger(o.invert) || o.invert < 0 || o.invert > 3)
+      throw new Error('Нужна прошивка v15 (формат 4)');
     Object.keys(ranges).forEach(k => {
       if (!Number.isFinite(o[k]) || o[k] < ranges[k][0]-1e-7 || o[k] > ranges[k][1]+1e-7)
         throw new Error('Недопустимое значение: ' + k);
     });
-    if (!INTS[o.version].every(k => Number.isInteger(o[k]))) throw new Error('Шаг должен быть целым числом');
+    if (![o.maxStep,o.holdMode,o.idleMinutes].every(Number.isInteger)) throw new Error('Шаг должен быть целым числом');
     return o;
   }
   function decode(dv) {
     if (dv.byteLength !== 40) throw new Error('Ожидалось 40 байт настроек');
-    const layout = LAYOUTS[dv.getUint8(1)];
-    if (!layout) throw new Error('Неизвестный формат настроек ' + dv.getUint8(1));
     const o = {};
     layout.forEach(([k,n,t]) => { o[k] = t === 'u8' ? dv.getUint8(n) : t === 'u16' ? dv.getUint16(n,true) : dv.getFloat32(n,true); });
     return validate(o);
   }
   function encode(o) {
     validate(o);
+    o = Object.assign({},o);
     const buffer = new ArrayBuffer(40), dv = new DataView(buffer);
-    LAYOUTS[o.version].forEach(([k,n,t]) => {
+    layout.forEach(([k,n,t]) => {
       if (t === 'u8') dv.setUint8(n,o[k]);
       else if (t === 'u16') dv.setUint16(n,o[k],true);
       else dv.setFloat32(n,o[k],true);
     });
     return buffer;
   }
-  // Fields the firmware owns (profile slot) are left out of the "did it apply" check.
-  function comparable(o) { const c = Object.assign({}, o); if (c.version === 5) c.profile = 0; return encode(c); }
   function equal(a,b) { return a.byteLength === b.byteLength && new Uint8Array(a).every((v,i) => v === new Uint8Array(b)[i]); }
   class Session {
     constructor(cfg,cmd) { this.cfg = cfg; this.cmd = cmd; this.active = true; this.tail = Promise.resolve(); }
@@ -325,18 +288,17 @@ details .tiles{margin:8px 0}
       return decode(raw);
     }
     async writeNow(o) {
-      o = Object.assign({}, o);
-      if (o.version === 4) o.idleMinutes = 7;
-      if (o.version === 5) o.reserved = 0;
-      await this.put(this.cfg,encode(o));
+      o = Object.assign({}, o, {idleMinutes: 7});
+      const raw = encode(o);
+      await this.put(this.cfg,raw);
       const actual = await this.readNow();
-      if (!equal(comparable(actual),comparable(o))) throw new Error('Устройство не применило эти значения; переподключитесь');
+      if (!equal(encode(actual),raw)) throw new Error('Устройство не применило эти значения; переподключитесь');
       return actual;
     }
     async commandNow(byte) {
       await this.put(this.cmd,new Uint8Array([byte]));
       if (!this.cmd.properties.read) return false;
-      for (let i=0;i<200;i++) {   // two files are written since 17.6: give flash ~10 s
+      for (let i=0;i<200;i++) {   // two files are written now (17.6+): give flash ~10 s
         this.check();
         const status = await this.cmd.readValue();
         this.check();
@@ -354,7 +316,7 @@ details .tiles{margin:8px 0}
     }
     defaults() { return this.enqueue(async () => { await this.commandNow(2); return this.readNow(); }); }
   }
-  const api = {validate,decode,encode,Session,LAYOUTS,RANGES};
+  const api = {validate,decode,encode,Session,layout,ranges};
   root.UmitProtocol = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -365,7 +327,7 @@ details .tiles{margin:8px 0}
   'use strict';
   const B = n => '6d5f' + n + '-1f8a-4c2e-9b3d-2a7e5c4b8f10';
   const SVC = B('0001'), CFG = B('0002'), CMD = B('0003'), BAT = B('0004'),
-        FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007'), HREC = B('0008');
+        FLIVE = B('0005'), FCFG = B('0006'), MLIVE = B('0007');
   const FULL = 0.15;                    // rise that fills the meter (sealed cap: presses +0.04..0.10)
   const $ = id => document.getElementById(id);
 
@@ -389,7 +351,7 @@ details .tiles{margin:8px 0}
   }
   function enable(on) {
     ['btn-save', 'btn-defaults'].forEach(id => $(id).disabled = !on);
-    document.querySelectorAll('main input, main .steps button, #presets button, #hostpre button')
+    document.querySelectorAll('main input, main .steps button, #presets button')
       .forEach(el => el.disabled = !on);
   }
 
@@ -411,9 +373,8 @@ details .tiles{margin:8px 0}
   }
 
   // ---- fill UI from cfg/fcfg -------------------------------------------
-  // tremor filter strength 0..100 -> cutoff 3.2 Hz .. 0.1 Hz (log); 1 Hz = 33
-  const tremOf = mc => Math.round(Math.min(100, Math.max(0, (0.5 - Math.log10(mc)) / 1.5 * 100)));
-  const mcOf = t => Math.pow(10, 0.5 - 1.5 * t / 100);
+  const smoothOf = mc => Math.round(Math.min(100, Math.max(0, (1 - Math.log10(mc)) * 50)));
+  const mcOf = s => Math.pow(10, 1 - s / 50);
   function fill() {
     if (fcfg) {
       const p = pct(fcfg.on);
@@ -425,15 +386,11 @@ details .tiles{margin:8px 0}
         b.classList.toggle('on', Math.abs(+b.dataset.on - fcfg.on) < 0.005));
     }
     if (cfg) {
-      const v5 = cfg.version === 5;
-      $('cur-old').hidden = v5; $('cur-new').hidden = !v5;
-      $('prof').textContent = v5 && cfg.profile < 4 ? '— настройки этого устройства (профиль ' + (cfg.profile + 1) + ')' : '';
-      if (v5) {
-        [['sx','slowGainX',1],['sy','slowGainY',1],['fx','fastGainX',0],['fy','fastGainY',0]].forEach(([id,k,dp]) => {
-          $('s-' + id).value = cfg[k]; $('o-' + id).textContent = cfg[k].toFixed(dp);
-        });
-        const tr = tremOf(cfg.minCutoff); $('s-trem').value = tr; $('o-trem').textContent = tr + '%';
-      }
+      $('s-x').value = cfg.yawSensitivity; $('o-x').textContent = cfg.yawSensitivity.toFixed(1);
+      $('s-y').value = cfg.pitchSensitivity; $('o-y').textContent = cfg.pitchSensitivity.toFixed(1);
+      $('s-dz').value = cfg.yawDeadzone; $('o-dz').textContent = cfg.yawDeadzone.toFixed(3);
+      const s = smoothOf(cfg.minCutoff);
+      $('s-smooth').value = s; $('o-smooth').textContent = s + '%';
       $('c-ix').checked = !!(cfg.invert & 1); $('c-iy').checked = !!(cfg.invert & 2);
     }
   }
@@ -577,7 +534,6 @@ details .tiles{margin:8px 0}
     const cur = new UmitProtocol.Session(await svc.getCharacteristic(CFG), await svc.getCharacteristic(CMD));
     cur.fcfgChr = await opt(svc, FCFG);
     cur.batChr = await opt(svc, BAT);
-    cur.recChr = await opt(svc, HREC);
     const fl = await opt(svc, FLIVE), ml = await opt(svc, MLIVE);
     cfg = await cur.read();
     if (cur.fcfgChr) fcfg = fcfgDecode(await cur.enqueue(() => cur.fcfgChr.readValue()));
@@ -585,7 +541,7 @@ details .tiles{margin:8px 0}
     if (fl) { fl.addEventListener('characteristicvaluechanged', onLive); await cur.enqueue(() => fl.startNotifications()); }
     if (ml) { ml.addEventListener('characteristicvaluechanged', onMotion); await cur.enqueue(() => ml.startNotifications()); }
     // 18.0: the mouse sends live data only while the page asks for it, about once a second
-    const keep = () => { if (link === cur && cur.keepOk && !rec && document.visibilityState === 'visible')   // paused while recording: frees the radio
+    const keep = () => { if (link === cur && cur.keepOk && document.visibilityState === 'visible')
       cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([3]))).catch(() => {}); };
     cur.keep = setInterval(keep, 1000);   // 17.x would answer 'bad command' to it: only 18+
     const fwWarn = $('old-fw');
@@ -599,15 +555,11 @@ details .tiles{margin:8px 0}
       cur.keepOk = parseFloat(v.replace(/^Umit\s*v?/, '')) >= 18; keep();
     } catch (e) { $('fw').textContent = 'прошивка: ?'; }
     fill(); enable(true); setDirty(false);
-    $('btn-rec').disabled = !cur.recChr;
-    if (!cur.recChr) $('rec-info').textContent = 'Нужна прошивка 18.1 или новее (после обновления — удалить Umit в Bluetooth и подключить заново).';
     status('Подключено' + (device.name ? ' — ' + device.name : ''), 'live');
     $('btn-connect').textContent = 'Переподключить';
     readBattery();
   }
   function drop() {
-    if (rec) recStop(true);               // keep what was recorded before the link dropped
-    $('btn-rec').disabled = true;
     if (link) { clearInterval(link.keep); link.close(); }
     link = null; live = motion = lastSent = null; enable(false); setDirty(false);
   }
@@ -643,23 +595,14 @@ details .tiles{margin:8px 0}
   $('s-on').addEventListener('input', e => { fcfg = fcfgFromOn(riseOf(+e.target.value)); pushFcfg(); });
   document.querySelectorAll('#presets button').forEach(b =>
     b.addEventListener('click', () => { fcfg = fcfgFromOn(+b.dataset.on); pushFcfg(); }));
-  [['sx','slowGainX'],['sy','slowGainY'],['fx','fastGainX'],['fy','fastGainY']].forEach(([id,k]) =>
-    $('s-' + id).addEventListener('input', e => { cfg[k] = +e.target.value; pushCfg(); }));
-  $('s-trem').addEventListener('input', e => { cfg.minCutoff = +mcOf(+e.target.value).toFixed(3); pushCfg(); });
-  // starting points measured on the recording of 2026-11-08; phone: portrait screen, nod range ~0.6 of turn
-  const HOSTPRE = {
-    pc:    {slowGainX: 10, slowGainY: 10, fastGainX: 160, fastGainY: 160, minCutoff: 1.0},
-    phone: {slowGainX: 6,  slowGainY: 12, fastGainX: 90,  fastGainY: 180, minCutoff: 1.0},
-    calm:  {minCutoff: 0.5}
-  };
-  document.querySelectorAll('#hostpre button').forEach(b => b.addEventListener('click', () => {
-    if (!cfg || cfg.version !== 5) return;
-    Object.assign(cfg, HOSTPRE[b.dataset.host]); pushCfg();
-  }));
+  $('s-x').addEventListener('input', e => { cfg.yawSensitivity = +e.target.value; pushCfg(); });
+  $('s-y').addEventListener('input', e => { cfg.pitchSensitivity = +e.target.value; pushCfg(); });
+  $('s-dz').addEventListener('input', e => { cfg.yawDeadzone = cfg.pitchDeadzone = +e.target.value; pushCfg(); });
+  $('s-smooth').addEventListener('input', e => { cfg.minCutoff = +mcOf(+e.target.value).toFixed(3); pushCfg(); });
   $('c-ix').addEventListener('change', e => { cfg.invert = (cfg.invert & 2) | (e.target.checked ? 1 : 0); pushCfg(); });
   $('c-iy').addEventListener('change', e => { cfg.invert = (cfg.invert & 1) | (e.target.checked ? 2 : 0); pushCfg(); });
   document.querySelectorAll('.steps button').forEach(b => b.addEventListener('click', () => {
-    const s = $(b.dataset.for), step = +b.dataset.step;
+    const s = $(b.dataset.for), step = (+b.dataset.step) * (s.id === 's-on' ? 1 : 1);
     s.value = Math.min(+s.max, Math.max(+s.min, +s.value + step));
     s.dispatchEvent(new Event('input'));
   }));
@@ -694,61 +637,6 @@ details .tiles{margin:8px 0}
       toast('Заводские значения. «Сохранить» — чтобы остались после перезагрузки');
     } catch (e) { toast('Не получилось: ' + (e.message || e), true); }
   });
-  // ---- head recording (firmware 18.1, char 0008) ----
-  const PHASES = [
-    [20, 'Держи голову неподвижно, смотри в центр экрана'],
-    [30, 'Мелкие точные движения: води курсор между двумя близкими точками'],
-    [30, 'Обычная работа: крупные движения через весь экран'],
-    [20, 'Снова спокойно, расслабься, голову не двигай'],
-    [30, 'Нажимай датчик как при кликах, голову старайся держать на месте'],
-  ];
-  let rec = null;
-  function recStop(save) {
-    if (!rec) return;
-    clearInterval(rec.timer);
-    const cur = link, r = rec; rec = null;
-    $('btn-rec').disabled = !link || !link.recChr; $('btn-rec-stop').disabled = true;
-    if (cur) cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([5]))).catch(() => {});
-    if (cur && r.chr) { r.chr.removeEventListener('characteristicvaluechanged', r.on); cur.enqueue(() => r.chr.stopNotifications()).catch(() => {}); }
-    if (!save || !r.rows.length) { $('rec-phase').textContent = 'Запись остановлена'; return; }
-    const csv = 'i,seq,phase,turn_dps,nod_dps,pressed,frozen\n' + r.rows.map(x => x.join(',')).join('\n') + '\n';
-    const a = document.createElement('a'), d = new Date();
-    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
-    a.download = 'umit-head-' + d.toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
-    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    $('rec-phase').textContent = 'Готово! Файл сохранён в «Загрузки»: ' + a.download;
-  }
-  $('btn-rec').addEventListener('click', async () => {
-    const cur = link; if (!cur || !cur.recChr || rec) return;
-    const total = PHASES.reduce((t, p) => t + p[0], 0);
-    rec = {rows: [], lost: 0, last: -1, chr: cur.recChr, t0: performance.now(), phase: 0};
-    rec.on = ev => {
-      const dv = ev.target.value; if (!rec || dv.byteLength !== 20) return;
-      const seq = dv.getUint16(2, true), fl = dv.getUint8(1);
-      if (rec.last >= 0) rec.lost += ((seq - rec.last - 1) & 0xffff);
-      rec.last = seq;
-      for (let k = 0; k < 4; k++) rec.rows.push([rec.rows.length, seq * 4 + k, rec.phase + 1,
-        (dv.getInt16(4 + k * 4, true) / 100).toFixed(2), (dv.getInt16(6 + k * 4, true) / 100).toFixed(2), fl & 1, (fl >> 1) & 1]);
-    };
-    rec.chr.addEventListener('characteristicvaluechanged', rec.on);
-    try {
-      await cur.enqueue(() => rec.chr.startNotifications());
-      await cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([4])));
-    } catch (e) { toast('Запись не началась: ' + (e.message || e), true); recStop(false); return; }
-    $('btn-rec').disabled = true; $('btn-rec-stop').disabled = false;
-    rec.timer = setInterval(() => {
-      if (!rec) return;
-      const t = (performance.now() - rec.t0) / 1000;
-      let acc = 0, i = 0; while (i < PHASES.length && t >= acc + PHASES[i][0]) acc += PHASES[i++][0];
-      if (i >= PHASES.length) { recStop(true); return; }
-      rec.phase = i;
-      $('rec-phase').textContent = (i + 1) + '/' + PHASES.length + ': ' + PHASES[i][1] + ' — ' + Math.ceil(acc + PHASES[i][0] - t) + ' с';
-      $('rec-bar').style.width = (100 * t / total) + '%';
-      $('rec-info').textContent = 'Записано ' + rec.rows.length + ' точек (' + (rec.rows.length / Math.max(1, t)).toFixed(0) + ' в секунду), потеряно пакетов: ' + rec.lost;
-    }, 200);
-  });
-  $('btn-rec-stop').addEventListener('click', () => recStop(true));
-
   $('btn-connect').addEventListener('click', connect);
   addEventListener('beforeunload', e => { if (dirty && link) { e.preventDefault(); e.returnValue = ''; } });
 
