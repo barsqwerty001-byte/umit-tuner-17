@@ -550,7 +550,7 @@ details .tiles{margin:8px 0}
     if (fl) { fl.addEventListener('characteristicvaluechanged', onLive); await cur.enqueue(() => fl.startNotifications()); }
     if (ml) { ml.addEventListener('characteristicvaluechanged', onMotion); await cur.enqueue(() => ml.startNotifications()); }
     // 18.0: the mouse sends live data only while the page asks for it, about once a second
-    const keep = () => { if (link === cur && cur.keepOk && document.visibilityState === 'visible')
+    const keep = () => { if (link === cur && cur.keepOk && !rec && document.visibilityState === 'visible')   // paused while recording: frees the radio
       cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([3]))).catch(() => {}); };
     cur.keep = setInterval(keep, 1000);   // 17.x would answer 'bad command' to it: only 18+
     const fwWarn = $('old-fw');
@@ -667,7 +667,7 @@ details .tiles{margin:8px 0}
     if (cur) cur.enqueue(() => cur.put(cur.cmd, new Uint8Array([5]))).catch(() => {});
     if (cur && r.chr) { r.chr.removeEventListener('characteristicvaluechanged', r.on); cur.enqueue(() => r.chr.stopNotifications()).catch(() => {}); }
     if (!save || !r.rows.length) { $('rec-phase').textContent = 'Запись остановлена'; return; }
-    const csv = 'i,phase,turn_dps,nod_dps,pressed,frozen\n' + r.rows.map(x => x.join(',')).join('\n') + '\n';
+    const csv = 'i,seq,phase,turn_dps,nod_dps,pressed,frozen\n' + r.rows.map(x => x.join(',')).join('\n') + '\n';
     const a = document.createElement('a'), d = new Date();
     a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
     a.download = 'umit-head-' + d.toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
@@ -683,7 +683,7 @@ details .tiles{margin:8px 0}
       const seq = dv.getUint16(2, true), fl = dv.getUint8(1);
       if (rec.last >= 0) rec.lost += ((seq - rec.last - 1) & 0xffff);
       rec.last = seq;
-      for (let k = 0; k < 4; k++) rec.rows.push([rec.rows.length, rec.phase + 1,
+      for (let k = 0; k < 4; k++) rec.rows.push([rec.rows.length, seq * 4 + k, rec.phase + 1,
         (dv.getInt16(4 + k * 4, true) / 100).toFixed(2), (dv.getInt16(6 + k * 4, true) / 100).toFixed(2), fl & 1, (fl >> 1) & 1]);
     };
     rec.chr.addEventListener('characteristicvaluechanged', rec.on);
